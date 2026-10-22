@@ -5,6 +5,13 @@
       name: "IntelinteractWidget",
       platforms: [.iOS(.v15)],
       products: [
+          .library(name: "IntelinteractWidget", targets:
+  ["IntelinteractWidgetCore"])
+      ],
+      targets: [
+      name: "IntelinteractWidget",
+      platforms: [.iOS(.v15)],
+      products: [
           .library(name: "IntelinteractWidget", targets: ["IntelinteractWidgetCore"])
       ],
       targets: [
