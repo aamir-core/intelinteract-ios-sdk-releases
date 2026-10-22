@@ -1,14 +1,7 @@
-// swift-tools-version: 5.9
+ // swift-tools-version: 5.9
   import PackageDescription
 
   let package = Package(
-      name: "IntelinteractWidget",
-      platforms: [.iOS(.v15)],
-      products: [
-          .library(name: "IntelinteractWidget", targets:
-  ["IntelinteractWidgetCore"])
-      ],
-      targets: [
       name: "IntelinteractWidget",
       platforms: [.iOS(.v15)],
       products: [
