@@ -14,7 +14,7 @@
           .binaryTarget(
               name: "IntelinteractWidgetCore",
               url: "https://github.com/aamir-core/intelinteract-ios-sdk-releases/releases/download/1.0.0/IntelinteractWidgetCore.xcframework.zip",
-              checksum: "97d3871385f9d3f837c088ae392df9dc82bf0e7bca6f8a36878991ee52941279"
+              checksum: "b5d406d65a218a99d8306ef7745305f8c84ef75d0de368dad550a8d9599a61bd"
           ),
           .target(
               name: "IntelinteractWidget",
