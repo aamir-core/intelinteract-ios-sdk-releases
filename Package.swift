@@ -8,7 +8,7 @@
           .library(name: "IntelinteractWidget", targets: ["IntelinteractWidget"])
       ],
       dependencies: [
-          .package(url: "https://github.com/livekit/client-sdk-swift.git", from: "2.5.0")
+          .package(url: "https://github.com/livekit/client-sdk-swift.git", from: "2.18.0")
       ],
       targets: [
           .binaryTarget(
