@@ -1,6 +1,6 @@
-# intelinteract Widget SDK — iOS
+# Intelinteract Widget SDK — iOS
 
-A plug-and-play customer support call/chat widget for iOS. Provides a floating button that opens a native modal with agent card, phone/OTP verification (or SSO via `APP_CONNECT`), and live voice/video calling via LiveKit.
+A plug-and-play customer support call/chat widget for iOS. Provides a floating button that opens a native modal with agent card, phone/OTP verification (or SSO via `APP_CONNECT`), live voice/video calling and AI text chat via LiveKit.
 
 ---
 
@@ -26,7 +26,7 @@ A plug-and-play customer support call/chat widget for iOS. Provides a floating b
    ```
    https://github.com/aamir-core/intelinteract-ios-sdk-releases
    ```
-3. Select **Up to Next Major Version** from `1.0.0`
+3. Select **Up to Next Major Version** from `1.1.0`
 4. Click **Add Package**
 5. Add **IntelinteractWidget** to your app target
 
@@ -38,9 +38,9 @@ Add these keys to your app's `Info.plist`:
 
 ```xml
 <key>NSMicrophoneUsageDescription</key>
-<string>intelinteract needs microphone access for voice calls.</string>
+<string>Intelinteract needs microphone access for voice calls.</string>
 <key>NSCameraUsageDescription</key>
-<string>intelinteract needs camera access for video calls.</string>
+<string>Intelinteract needs camera access for video calls.</string>
 ```
 
 ---
@@ -67,9 +67,12 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
             in: window
         ) { event in
             // event.action     → "CALL_INITIATED" | "CALL_RINGING" | "CALL_PICKED_UP" | "CALL_ENDED"
+            //                    | "CHAT_INITIATED" | "CHAT_CONNECTED" | "CHAT_MESSAGE_SENT"
+            //                    | "CHAT_MESSAGE_RECEIVED" | "CHAT_ENDED" | "CHAT_ERROR"
             // event.agentName  → display name of the agent
             // event.userId     → resolved Contact ID (available after auth)
             // event.token      → session token (available after auth)
+            // event.message    → chat text for CHAT_MESSAGE_*, error text for CHAT_ERROR
             print("IntelinteractEvent: \(event.action) — \(event.agentName)")
         }
 
@@ -81,7 +84,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
 #### SSO auth (`APP_CONNECT`)
 
-> **Prerequisite:** the widget must be configured with `providerType: "APP_CONNECT"` on the intelinteract server side. Contact the intelinteract team to enable this for your widget.
+> **Prerequisite:** the widget must be configured with `providerType: "APP_CONNECT"` on the Intelinteract server side. Contact the Intelinteract team to enable this for your widget.
 
 When `APP_CONNECT` is enabled, the OTP / phone-number screen is skipped entirely. Call `setToken()` with your backend-issued JWT as soon as it is available. The SDK buffers the token internally — it is safe to call `setToken()` before `initialize()` completes.
 
@@ -95,7 +98,7 @@ IntelinteractWidget.shared.setToken("jwt-from-your-backend")
 IntelinteractWidget.shared.show()
 ```
 
-The widget exchanges the JWT for a intelinteract session token automatically and loads the user's details.
+The widget exchanges the JWT for a Intelinteract session token automatically and loads the user's details.
 
 ---
 
@@ -115,17 +118,53 @@ The widget exchanges the JWT for a intelinteract session token automatically and
 
 | Field        | Type      | Description                                      |
 |--------------|-----------|--------------------------------------------------|
-| `action`     | `String`  | One of `CALL_INITIATED`, `CALL_RINGING`, `CALL_PICKED_UP`, `CALL_ENDED` |
+| `action`     | `String`  | Call: `CALL_INITIATED`, `CALL_RINGING`, `CALL_PICKED_UP`, `CALL_ENDED`. Chat: `CHAT_INITIATED`, `CHAT_CONNECTED`, `CHAT_MESSAGE_SENT`, `CHAT_MESSAGE_RECEIVED`, `CHAT_ENDED`, `CHAT_ERROR` |
 | `agentName`  | `String`  | Display name of the agent                        |
-| `userId`     | `String?` | Resolved Contact ID in the intelinteract system (set after auth) |
+| `userId`     | `String?` | Resolved Contact ID in the Intelinteract system (set after auth) |
 | `token`      | `String?` | Session token (set after auth)                   |
+| `message`    | `String?` | Chat text for `CHAT_MESSAGE_SENT` / `CHAT_MESSAGE_RECEIVED`, error text for `CHAT_ERROR` |
 | `timestamp`  | `Date`    | Event timestamp                                  |
+
+---
+
+## AI Chat
+
+When the widget config has `chat: true`, the post-login screen shows a **Start Chat** button. No extra code is required: the SDK opens a native full-height chat screen and connects the user to the team's AI agent.
+
+**What happens under the hood**
+1. `POST /chats` creates the chat, then `POST /chats/{chatId}/threads` returns LiveKit room credentials.
+2. The SDK joins that room **text-only**: no microphone, no camera, no audio playback, so the app's audio session is untouched.
+3. User messages are sent as LiveKit text streams on topic `chat`. Agent replies stream back on the same topic and render live as they arrive.
+
+**Behaviour**
+- The status line shows *Connecting… → Online → Typing…* while the agent is replying.
+- **Swiping the sheet down** minimises the chat. The room stays connected and the floating button pulses; tap it to reopen the chat with its history.
+- **End** closes the chat. If the agent or server ends the room, the transcript stays on screen, the input is locked and the button changes to **Close**.
+- `destroy()` also ends any active chat.
+
+> **Upgrading from 1.0.x:** update the package to **1.1.0**. Chat needs LiveKit text streams, so the SDK now requires `client-sdk-swift` **2.15.0 or newer**; Swift Package Manager resolves this for you.
+
+**Listening to chat events**
+
+```swift
+IntelinteractWidget.shared.initialize(tenantId: "your-tenant-id", widgetId: "your-widget-id", in: window) { event in
+    switch event.action {
+    case "CHAT_INITIATED":        break                                 // chat created on the backend
+    case "CHAT_CONNECTED":        break                                 // room joined, user can type
+    case "CHAT_MESSAGE_SENT":     print("me: \(event.message ?? "")")
+    case "CHAT_MESSAGE_RECEIVED": print("agent: \(event.message ?? "")")
+    case "CHAT_ENDED":            break                                 // chat closed
+    case "CHAT_ERROR":            print("chat error: \(event.message ?? "")")
+    default:                      break
+    }
+}
+```
 
 ---
 
 ## Credentials
 
-Contact the intelinteract team to obtain your `tenantId` and `widgetId`.
+Contact the Intelinteract team to obtain your `tenantId` and `widgetId`.
 
 </details>
 
@@ -144,7 +183,7 @@ Contact the intelinteract team to obtain your `tenantId` and `widgetId`.
    ```
    https://github.com/aamir-core/intelinteract-ios-sdk-releases
    ```
-4. Select **Up to Next Major Version** from `1.0.0`
+4. Select **Up to Next Major Version** from `1.1.0`
 5. Click **Add Package**
 6. Add **IntelinteractWidget** to your app target
 
@@ -156,9 +195,9 @@ Add these keys to your app's `Info.plist`:
 
 ```xml
 <key>NSMicrophoneUsageDescription</key>
-<string>intelinteract needs microphone access for voice calls.</string>
+<string>Intelinteract needs microphone access for voice calls.</string>
 <key>NSCameraUsageDescription</key>
-<string>intelinteract needs camera access for video calls.</string>
+<string>Intelinteract needs camera access for video calls.</string>
 ```
 
 ---
@@ -221,6 +260,7 @@ final class IntelinteractWidgetModule: RCTEventEmitter {
                     "agentName": event.agentName,
                     "userId":    event.userId as Any,
                     "token":     event.token  as Any,
+                    "message":   event.message as Any,
                     "timestamp": event.timestamp.timeIntervalSince1970 * 1000
                 ])
             }
@@ -319,9 +359,12 @@ export default function App() {
 
         const subscription = IntelinteractWidget.addListener((event) => {
             // event.action     → "CALL_INITIATED" | "CALL_RINGING" | "CALL_PICKED_UP" | "CALL_ENDED"
+            //                    | "CHAT_INITIATED" | "CHAT_CONNECTED" | "CHAT_MESSAGE_SENT"
+            //                    | "CHAT_MESSAGE_RECEIVED" | "CHAT_ENDED" | "CHAT_ERROR"
             // event.agentName  → display name of the agent
             // event.userId     → resolved Contact ID (available after auth)
             // event.token      → session token (available after auth)
+            // event.message    → chat text for CHAT_MESSAGE_*, error text for CHAT_ERROR
             // event.timestamp  → Unix timestamp in milliseconds
             console.log('IntelinteractEvent:', event);
         });
@@ -338,7 +381,7 @@ export default function App() {
 
 #### SSO auth (`APP_CONNECT`)
 
-> **Prerequisite:** the widget must be configured with `providerType: "APP_CONNECT"` on the intelinteract server side.
+> **Prerequisite:** the widget must be configured with `providerType: "APP_CONNECT"` on the Intelinteract server side.
 
 ```tsx
 import React, { useEffect } from 'react';
@@ -385,17 +428,51 @@ export default function App() {
 
 | Field        | Type     | Description                                      |
 |--------------|----------|--------------------------------------------------|
-| `action`     | `string` | One of `CALL_INITIATED`, `CALL_RINGING`, `CALL_PICKED_UP`, `CALL_ENDED` |
+| `action`     | `string` | Call: `CALL_INITIATED`, `CALL_RINGING`, `CALL_PICKED_UP`, `CALL_ENDED`. Chat: `CHAT_INITIATED`, `CHAT_CONNECTED`, `CHAT_MESSAGE_SENT`, `CHAT_MESSAGE_RECEIVED`, `CHAT_ENDED`, `CHAT_ERROR` |
 | `agentName`  | `string` | Display name of the agent                        |
-| `userId`     | `string` | Resolved Contact ID in the intelinteract system (set after auth) |
+| `userId`     | `string` | Resolved Contact ID in the Intelinteract system (set after auth) |
 | `token`      | `string` | Session token (set after auth)                   |
+| `message`    | `string` | Chat text for `CHAT_MESSAGE_SENT` / `CHAT_MESSAGE_RECEIVED`, error text for `CHAT_ERROR` |
 | `timestamp`  | `number` | Unix timestamp in milliseconds                   |
+
+---
+
+## AI Chat
+
+When the widget config has `chat: true`, the post-login screen shows a **Start Chat** button. No extra code is required: the SDK opens a native full-height chat screen and connects the user to the team's AI agent.
+
+**What happens under the hood**
+1. `POST /chats` creates the chat, then `POST /chats/{chatId}/threads` returns LiveKit room credentials.
+2. The SDK joins that room **text-only**: no microphone, no camera, no audio playback, so the app's audio session is untouched.
+3. User messages are sent as LiveKit text streams on topic `chat`. Agent replies stream back on the same topic and render live as they arrive.
+
+**Behaviour**
+- The status line shows *Connecting… → Online → Typing…* while the agent is replying.
+- **Swiping the sheet down** minimises the chat. The room stays connected and the floating button pulses; tap it to reopen the chat with its history.
+- **End** closes the chat. If the agent or server ends the room, the transcript stays on screen, the input is locked and the button changes to **Close**.
+- `destroy()` also ends any active chat.
+
+> **Already integrated an earlier version?** Update the package to **1.1.0** and add the `"message": event.message as Any,` line to the event body in `IntelinteractWidgetModule.swift` (step 4). Without it, chat events still arrive but `event.message` is undefined.
+
+**Listening to chat events**
+
+```tsx
+const subscription = IntelinteractWidget.addListener((event) => {
+    switch (event.action) {
+        case 'CHAT_CONNECTED':        /* room joined, user can type */ break;
+        case 'CHAT_MESSAGE_SENT':     console.log('me:', event.message); break;
+        case 'CHAT_MESSAGE_RECEIVED': console.log('agent:', event.message); break;
+        case 'CHAT_ENDED':            /* chat closed */ break;
+        case 'CHAT_ERROR':            console.warn('chat error:', event.message); break;
+    }
+});
+```
 
 ---
 
 ## Credentials
 
-Contact the intelinteract team to obtain your `tenantId` and `widgetId`.
+Contact the Intelinteract team to obtain your `tenantId` and `widgetId`.
 
 </details>
 
@@ -414,7 +491,7 @@ Contact the intelinteract team to obtain your `tenantId` and `widgetId`.
    ```
    https://github.com/aamir-core/intelinteract-ios-sdk-releases
    ```
-4. Select **Up to Next Major Version** from `1.0.0`
+4. Select **Up to Next Major Version** from `1.1.0`
 5. Click **Add Package**
 6. Add **IntelinteractWidget** to your app target
 
@@ -426,9 +503,9 @@ Add these keys to your app's `Info.plist`:
 
 ```xml
 <key>NSMicrophoneUsageDescription</key>
-<string>intelinteract needs microphone access for voice calls.</string>
+<string>Intelinteract needs microphone access for voice calls.</string>
 <key>NSCameraUsageDescription</key>
-<string>intelinteract needs camera access for video calls.</string>
+<string>Intelinteract needs camera access for video calls.</string>
 ```
 
 ---
@@ -472,6 +549,7 @@ public class IntelinteractPlugin: NSObject, FlutterPlugin, FlutterStreamHandler 
                         "agentName": event.agentName,
                         "userId":    event.userId as Any,
                         "token":     event.token  as Any,
+                        "message":   event.message as Any,
                         "timestamp": event.timestamp.timeIntervalSince1970 * 1000
                     ])
                 }
@@ -571,6 +649,7 @@ class IntelinteractEvent {
   final String agentName;
   final String? userId;
   final String? token;
+  final String? message;
   final double timestamp;
 
   const IntelinteractEvent({
@@ -578,6 +657,7 @@ class IntelinteractEvent {
     required this.agentName,
     this.userId,
     this.token,
+    this.message,
     required this.timestamp,
   });
 
@@ -586,6 +666,7 @@ class IntelinteractEvent {
         agentName: map['agentName'] as String? ?? '',
         userId:    map['userId']    as String?,
         token:     map['token']     as String?,
+        message:   map['message']   as String?,
         timestamp: (map['timestamp'] as num?)?.toDouble() ?? 0,
       );
 }
@@ -668,9 +749,12 @@ class _MyAppState extends State<MyApp> {
 
     _subscription = IntelinteractWidget.onEvent.listen((event) {
       // event.action     → "CALL_INITIATED" | "CALL_RINGING" | "CALL_PICKED_UP" | "CALL_ENDED"
+      //                    | "CHAT_INITIATED" | "CHAT_CONNECTED" | "CHAT_MESSAGE_SENT"
+      //                    | "CHAT_MESSAGE_RECEIVED" | "CHAT_ENDED" | "CHAT_ERROR"
       // event.agentName  → display name of the agent
       // event.userId     → resolved Contact ID (available after auth)
       // event.token      → session token (available after auth)
+      // event.message    → chat text for CHAT_MESSAGE_*, error text for CHAT_ERROR
       // event.timestamp  → Unix timestamp in milliseconds
       debugPrint('IntelinteractEvent: ${event.action} | ${event.agentName}');
     });
@@ -697,7 +781,7 @@ class _MyAppState extends State<MyApp> {
 
 #### SSO auth (`APP_CONNECT`)
 
-> **Prerequisite:** the widget must be configured with `providerType: "APP_CONNECT"` on the intelinteract server side.
+> **Prerequisite:** the widget must be configured with `providerType: "APP_CONNECT"` on the Intelinteract server side.
 
 ```dart
 Future<void> _initIntelinteract() async {
@@ -733,17 +817,51 @@ Future<void> _initIntelinteract() async {
 
 | Field        | Type      | Description                                      |
 |--------------|-----------|--------------------------------------------------|
-| `action`     | `String`  | One of `CALL_INITIATED`, `CALL_RINGING`, `CALL_PICKED_UP`, `CALL_ENDED` |
+| `action`     | `String`  | Call: `CALL_INITIATED`, `CALL_RINGING`, `CALL_PICKED_UP`, `CALL_ENDED`. Chat: `CHAT_INITIATED`, `CHAT_CONNECTED`, `CHAT_MESSAGE_SENT`, `CHAT_MESSAGE_RECEIVED`, `CHAT_ENDED`, `CHAT_ERROR` |
 | `agentName`  | `String`  | Display name of the agent                        |
-| `userId`     | `String?` | Resolved Contact ID in the intelinteract system (set after auth) |
+| `userId`     | `String?` | Resolved Contact ID in the Intelinteract system (set after auth) |
 | `token`      | `String?` | Session token (set after auth)                   |
+| `message`    | `String?` | Chat text for `CHAT_MESSAGE_SENT` / `CHAT_MESSAGE_RECEIVED`, error text for `CHAT_ERROR` |
 | `timestamp`  | `double`  | Unix timestamp in milliseconds                   |
+
+---
+
+## AI Chat
+
+When the widget config has `chat: true`, the post-login screen shows a **Start Chat** button. No extra code is required: the SDK opens a native full-height chat screen and connects the user to the team's AI agent.
+
+**What happens under the hood**
+1. `POST /chats` creates the chat, then `POST /chats/{chatId}/threads` returns LiveKit room credentials.
+2. The SDK joins that room **text-only**: no microphone, no camera, no audio playback, so the app's audio session is untouched.
+3. User messages are sent as LiveKit text streams on topic `chat`. Agent replies stream back on the same topic and render live as they arrive.
+
+**Behaviour**
+- The status line shows *Connecting… → Online → Typing…* while the agent is replying.
+- **Swiping the sheet down** minimises the chat. The room stays connected and the floating button pulses; tap it to reopen the chat with its history.
+- **End** closes the chat. If the agent or server ends the room, the transcript stays on screen, the input is locked and the button changes to **Close**.
+- `destroy()` also ends any active chat.
+
+> **Already integrated an earlier version?** Update the package to **1.1.0**, add the `"message": event.message as Any,` line to the event map in `IntelinteractPlugin.swift` (step 3), and add the `message` field to `IntelinteractEvent` in the Dart bridge (step 6).
+
+**Listening to chat events**
+
+```dart
+_subscription = IntelinteractWidget.onEvent.listen((event) {
+  switch (event.action) {
+    case 'CHAT_CONNECTED':        /* room joined, user can type */ break;
+    case 'CHAT_MESSAGE_SENT':     debugPrint('me: ${event.message}'); break;
+    case 'CHAT_MESSAGE_RECEIVED': debugPrint('agent: ${event.message}'); break;
+    case 'CHAT_ENDED':            /* chat closed */ break;
+    case 'CHAT_ERROR':            debugPrint('chat error: ${event.message}'); break;
+  }
+});
+```
 
 ---
 
 ## Credentials
 
-Contact the intelinteract team to obtain your `tenantId` and `widgetId`.
+Contact the Intelinteract team to obtain your `tenantId` and `widgetId`.
 
 </details>
 
@@ -755,5 +873,5 @@ Contact the intelinteract team to obtain your `tenantId` and `widgetId`.
 - The floating button can be **dragged** anywhere on screen and snaps to the nearest edge on release.
 - Pass `fabX` and `fabY` to `initialize()` / `init()` to set the button's **initial position** (in points from the top-left corner). Defaults to bottom-right if omitted.
 - Call and chat features are individually toggled by the widget configuration fetched from the server.
-- Microphone and camera permissions are requested at runtime when the user initiates a call.
+- Microphone and camera permissions are requested at runtime when the user initiates a call. **Chat needs neither**: it is text-only and never touches the microphone, camera or audio session.
 - When `providerType` is `APP_CONNECT`, call `setToken()` as soon as your user's token is available. The SDK buffers the token internally and applies it once the widget config has been fetched, so there is no need to wait for `initialize()` to complete before calling `setToken()`.
